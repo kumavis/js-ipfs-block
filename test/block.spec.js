@@ -2,63 +2,61 @@
 'use strict'
 
 const expect = require('chai').expect
-const multihashing = require('multihashing-async')
 const parallel = require('async/parallel')
 const Block = require('../src')
+const mh = require('multihashes')
+
+function expectKey (block, hashFn, expectedKey, callback) {
+  const cb = (err, key) => {
+    if (err) {
+      return callback(err)
+    }
+    expect(mh.toB58String(key)).to.be.eql(expectedKey)
+    callback()
+  }
+
+  if (typeof expectedKey === 'function') {
+    callback = expectedKey
+    expectedKey = hashFn
+    block.key(cb)
+  } else {
+    block.key(hashFn, cb)
+  }
+}
 
 describe('block', () => {
-  const data = new Buffer('random-data')
-  let hash
-  before((done) => {
-    multihashing(data, 'sha2-256', (err, digest) => {
-      if (err) {
-        return done(err)
-      }
-
-      hash = digest
-      done()
-    })
-  })
-
-  it('create', () => {
-    const b = new Block('random-data', hash)
-    expect(b.key).to.be.eql(hash)
+  it('create', (done) => {
+    const b = new Block('random-data')
     expect(b.data).to.exist
-    expect(b.extension).to.be.eql('data')
+    parallel([
+      (cb) => expectKey(b, 'QmeoBGh5g5kHgK3xppJ1YPwB9xgH2GoqhMSuQVpzDdvtJG', cb),
+      (cb) => expectKey(b, 'sha1', '5dsvLgRV9RVj9eSgtxMrXQjbpfFeHY', cb)
+    ], done)
   })
 
-  it('create /wo new', () => {
-    const b = Block('random-data', hash)
-    expect(b.key).to.be.eql(hash)
+  it('create /wo new', (done) => {
+    const b = Block('random-data')
     expect(b.data).to.exist
-    expect(b.extension).to.be.eql('data')
-  })
-
-  it('create without hash', (done) => {
-    Block.create('random-data', (err, b) => {
-      expect(err).to.not.exist
-      expect(b.key).to.be.eql(hash)
-      expect(b.data).to.exist
-      expect(b.extension).to.be.eql('data')
-      done()
-    })
+    parallel([
+      (cb) => expectKey(b, 'QmeoBGh5g5kHgK3xppJ1YPwB9xgH2GoqhMSuQVpzDdvtJG', cb),
+      (cb) => expectKey(b, 'sha1', '5dsvLgRV9RVj9eSgtxMrXQjbpfFeHY', cb)
+    ], done)
   })
 
   it('fail to create an empty block', () => {
     expect(() => new Block()).to.throw()
   })
 
-  it('fail to create with missing hash', () => {
-    expect(() => new Block('hello')).to.throw()
-  })
-
   it('2 different blocks have different hashes', (done) => {
+    const b1 = new Block('random-data')
+    const b2 = new Block('more-random-data')
+
     parallel([
-      (cb) => Block.create('random-data', cb),
-      (cb) => Block.create('more-random-data', cb)
-    ], (err, blocks) => {
+      (cb) => b1.key(cb),
+      (cb) => b2.key(cb)
+    ], (err, keys) => {
       expect(err).to.not.exist
-      expect(blocks[0]).to.not.deep.equal(blocks[1])
+      expect(keys[0]).to.not.deep.equal(keys[1])
       done()
     })
   })
@@ -67,33 +65,9 @@ describe('block', () => {
     // it from the original implementation
     // It doesn't stricly verify the immutability of the Block object
     const block = new Block("Can't change this!")
-    let key = block.key
+    let key = block.key()
     key = new Buffer('new key')
 
-    expect(key.equals(block.key)).to.equal(false)
-  })
-
-  it('has the right extension to type mapping', (done) => {
-    parallel([
-      (cb) => Block.create('hello', 'protobuf', cb),
-      (cb) => Block.create('hello', cb),
-      (cb) => Block.create('hello', 'ipld', cb),
-      (cb) => Block.create('hello', 'woot', cb)
-    ], (err, b) => {
-      expect(err).to.not.exist
-
-      expect(b[0].type).to.be.eql('protobuf')
-      expect(b[0].extension).to.be.eql('data')
-
-      expect(b[1].type).to.be.eql('protobuf')
-      expect(b[1].extension).to.be.eql('data')
-
-      expect(b[2].type).to.be.eql('ipld')
-      expect(b[2].extension).to.be.eql('ipld')
-
-      expect(b[3].type).to.be.eql('woot')
-      expect(b[3].extension).to.be.eql('woot')
-      done()
-    })
+    expect(key).to.not.eql(block.key())
   })
 })

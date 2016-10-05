@@ -39,10 +39,11 @@
   "devDependencies": {
     "aegir": "^8.0.0",
     "async": "^2.0.1",
-    "chai": "^3.5.0",
+    "chai": "^3.5.0"
+  },
+  "dependencies": {
     "multihashing-async": "^0.1.0"
   },
-  "dependencies": {},
   "contributors": [
     "David Dias <daviddias.p@gmail.com>",
     "dignifiedquire <dignifiedquire@gmail.com>"
